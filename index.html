@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>供需平衡分析平台</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,'Helvetica Neue',Arial,sans-serif;background:#F5F4F0;color:#1A1916;font-size:13px}
+.hdr{background:#1A1916;color:#fff;padding:0 28px;height:52px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:20}
+.hdr-dot{width:8px;height:8px;border-radius:50%;background:#4ADE80;flex-shrink:0}
+.hdr-title{font-size:14px;font-weight:600}
+.hdr-r{font-size:12px;color:rgba(255,255,255,.4);margin-left:auto}
+.main{max-width:1400px;margin:0 auto;padding:28px 20px 64px}
+
+/* Upload */
+.upload-card{background:#fff;border:1px solid #E2E0D8;border-radius:10px;padding:52px 32px;text-align:center;margin-bottom:0}
+.dz{border:2px dashed #E2E0D8;border-radius:10px;padding:44px 24px;cursor:pointer;transition:all .18s;max-width:520px;margin:0 auto}
+.dz:hover,.dz.over{border-color:#2563EB;background:#EFF4FF}
+.dz-icon{width:52px;height:52px;background:#F0EFEB;border-radius:12px;display:flex;align-items:center;justify-content:center;margin:0 auto 16px}
+.dz-title{font-size:16px;font-weight:600;margin-bottom:6px}
+.dz-sub{font-size:13px;color:#6B6960;line-height:1.6}
+.ubtn{margin-top:20px;background:#1A1916;color:#fff;border:none;padding:10px 28px;border-radius:6px;font-size:14px;font-weight:500;cursor:pointer}
+.ubtn:hover{opacity:.82}
+#st{margin-top:14px;font-size:13px;color:#6B6960;min-height:20px}
+
+/* Results */
+#res{display:none}
+.rh{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px}
+.rh h1{font-size:20px;font-weight:700;letter-spacing:-.4px}
+.rh p{font-size:12px;color:#6B6960;margin-top:2px}
+.rbtn{background:none;border:1px solid #E2E0D8;border-radius:6px;padding:7px 14px;font-size:12px;cursor:pointer;color:#6B6960}
+.rbtn:hover{background:#F0EFEB}
+
+/* KPI */
+.krow{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:20px}
+.kcard{background:#fff;border:1px solid #E2E0D8;border-radius:8px;padding:14px 16px}
+.klbl{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:#9E9D96;margin-bottom:6px}
+.kval{font-size:22px;font-weight:700;letter-spacing:-.5px;line-height:1}
+.ksub{font-size:11px;color:#9E9D96;margin-top:3px}
+
+/* Tabs */
+.tabs{display:flex;gap:3px;background:#EAEAE6;border-radius:6px;padding:3px;margin-bottom:16px;width:fit-content}
+.tb{background:none;border:none;border-radius:4px;padding:6px 16px;font-size:12px;font-weight:500;cursor:pointer;color:#6B6960}
+.tb.on{background:#fff;color:#1A1916;box-shadow:0 1px 3px rgba(0,0,0,.1)}
+
+/* Panel */
+.panel{background:#fff;border:1px solid #E2E0D8;border-radius:10px;padding:20px;margin-bottom:16px}
+.ptitle{font-size:14px;font-weight:600;margin-bottom:3px}
+.psub{font-size:11px;color:#9E9D96;margin-bottom:14px}
+
+/* Summary Table */
+.tscroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.stbl{border-collapse:collapse;white-space:nowrap;font-size:12px;width:100%}
+.stbl th.rl{text-align:left;padding:8px 12px 8px 0;position:sticky;left:0;background:#fff;z-index:5;min-width:190px;font-weight:600;font-size:11px;color:#9E9D96;border-bottom:2px solid #E2E0D8}
+.stbl td.rl{text-align:left;padding:7px 12px 7px 0;position:sticky;left:0;background:#fff;z-index:5;font-size:12px;font-weight:500;min-width:190px;border-right:1px solid #F0EFEB}
+.stbl th.mc{padding:8px 10px;text-align:right;font-size:11px;font-weight:600;color:#9E9D96;min-width:76px;border-bottom:2px solid #E2E0D8}
+.stbl td{padding:7px 10px;text-align:right;min-width:76px;border-bottom:1px solid #F0EFEB}
+.stbl .sh td,.stbl .sh td.rl{background:#F5F4F0;font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#9E9D96;padding:5px 10px;border-bottom:none}
+.neg{color:#DC2626;font-weight:600}.pos{color:#16A34A}.neu{color:#1A1916}
+.mp-g{background:#DCFCE7;color:#15803D;font-weight:700;border-radius:4px;text-align:center}
+.mp-y{background:#FEF9C3;color:#854D0E;font-weight:700;border-radius:4px;text-align:center}
+.rok{color:#16A34A;font-weight:700}.rwarn{color:#D97706;font-weight:700}.rbad{color:#DC2626;font-weight:700}
+.stbl tr:not(.sh):hover td,.stbl tr:not(.sh):hover td.rl{background:#F8F7F5}
+
+/* Chart */
+canvas{display:block}
+.leg{display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:#6B6960;align-items:center;margin-bottom:10px}
+.lsq{width:9px;height:9px;border-radius:2px;display:inline-block;vertical-align:middle;margin-right:3px}
+.ldsh{width:16px;height:0;display:inline-block;border-top:2px dashed;vertical-align:middle;margin-right:3px}
+.alert{display:flex;gap:8px;background:#FEF2F2;border:1px solid #FCA5A5;border-radius:6px;padding:10px 14px;font-size:12px;color:#DC2626;margin-bottom:16px}
+
+@media(max-width:640px){.krow{grid-template-columns:repeat(2,1fr)}.main{padding:16px 12px 48px}}
+</style>
+</head>
+<body>
+<header class="hdr">
+  <span class="hdr-dot"></span>
+  <span class="hdr-title">供需平衡分析平台</span>
+  <span class="hdr-r" id="hf">上傳排程檔案以開始分析</span>
+</header>
+<main class="main">
+
+  <!-- Upload -->
+  <div id="upsec" class="upload-card">
+    <div class="dz" id="dz" onclick="document.getElementById('fi').click()">
+      <div class="dz-icon">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#6B6960" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+          <line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/>
+        </svg>
+      </div>
+      <p class="dz-title">拖曳排程 Excel 至此</p>
+      <p class="dz-sub">支援 .xlsx 格式<br>需含「排程表」工作表（供給）與「PAB」工作表（摘要）</p>
+      <button class="ubtn" onclick="event.stopPropagation();document.getElementById('fi').click()">選擇檔案</button>
+    </div>
+    <input type="file" id="fi" accept=".xlsx,.xls" style="display:none">
+    <p id="st"></p>
+  </div>
+
+  <!-- Results -->
+  <div id="res">
+    <div class="rh">
+      <div><h1 id="ptitle">供需平衡分析</h1><p id="psub"></p></div>
+      <button class="rbtn" onclick="doReset()">↺ 重新上傳</button>
+    </div>
+
+    <div id="abar" class="alert" style="display:none">⚠ <span id="atxt"></span></div>
+
+    <div class="krow" id="kg"></div>
+
+    <div class="tabs">
+      <button class="tb on" id="t0" onclick="sw(0)">供需摘要表</button>
+      <button class="tb" id="t1" onclick="sw(1)">月供需圖</button>
+      <button class="tb" id="t2" onclick="sw(2)">累計達成率</button>
+    </div>
+
+    <!-- Pane 0: Summary Table -->
+    <div id="p0" class="panel">
+      <p class="ptitle">月度供需平衡摘要</p>
+      <p class="psub">組裝段 / 成品段雙層供需 · 人力配置 · 紅色 = 缺貨，綠色 = 充裕</p>
+      <div class="tscroll"><table class="stbl" id="stbl"></table></div>
+    </div>
+
+    <!-- Pane 1 -->
+    <div id="p1" class="panel" style="display:none">
+      <p class="ptitle">月需求 vs 月供給（成品段）</p>
+      <p class="psub">跨月工單依投料→完工天數比例分配供給量；FCST 預測單計入需求</p>
+      <div class="leg">
+        <span><span class="lsq" style="background:#2563EB"></span>月需求</span>
+        <span><span class="lsq" style="background:#16A34A"></span>月供給(成品段)</span>
+        <span><span class="ldsh" style="border-color:#DC2626"></span>期末庫存</span>
+      </div>
+      <div style="position:relative;height:300px"><canvas id="c0"></canvas></div>
+    </div>
+
+    <!-- Pane 2 -->
+    <div id="p2" class="panel" style="display:none">
+      <p class="ptitle">累計需求 vs 累計供給 + 達成率</p>
+      <p class="psub">達成率 = ACC. Supply ÷ ACC. Demand × 100%</p>
+      <div class="leg">
+        <span><span class="lsq" style="background:#2563EB"></span>ACC. Demand</span>
+        <span><span class="ldsh" style="border-color:#16A34A"></span>ACC. Supply</span>
+        <span><span class="ldsh" style="border-color:#D97706"></span>達成率 %</span>
+      </div>
+      <div style="position:relative;height:300px"><canvas id="c1"></canvas></div>
+    </div>
+  </div>
+</main>
+
+<script>
+var ch0=null,ch1=null;
+
+// ── Upload & parse ────────────────────────────────────────────────────────────
+var dz=document.getElementById('dz');
+dz.addEventListener('dragover',function(e){e.preventDefault();dz.classList.add('over');});
+dz.addEventListener('dragleave',function(){dz.classList.remove('over');});
+dz.addEventListener('drop',function(e){e.preventDefault();dz.classList.remove('over');go(e.dataTransfer.files[0]);});
+document.getElementById('fi').addEventListener('change',function(e){go(e.target.files[0]);});
+
+function setst(m,c){var el=document.getElementById('st');el.textContent=m;el.style.color=c||'#6B6960';}
+function doReset(){
+  document.getElementById('res').style.display='none';
+  document.getElementById('upsec').style.display='';
+  document.getElementById('fi').value='';
+  document.getElementById('hf').textContent='上傳排程檔案以開始分析';
+  setst('');
+  if(ch0){ch0.destroy();ch0=null;} if(ch1){ch1.destroy();ch1=null;}
+}
+
+function go(file){
+  if(!file)return;
+  if(!file.name.match(/\.xlsx?$/i)){setst('請上傳 .xlsx 格式','#DC2626');return;}
+  setst('解析中，請稍候...');
+  var r=new FileReader();
+  r.onload=function(e){
+    try{
+      var wb=XLSX.read(e.target.result,{type:'array',cellDates:true});
+      // Try PAB sheet first for summary, then 排程表 for supply calc
+      var pabSheet=wb.SheetNames.find(function(n){return n==='PAB'||n==='PAB(2)';});
+      var schedSheet=wb.SheetNames.find(function(n){return n.includes('排程表');});
+      if(!schedSheet&&!pabSheet){setst('找不到「排程表」或「PAB」工作表','#DC2626');return;}
+
+      var D={};
+      // Parse 排程表 for supply/demand calculation
+      if(schedSheet){
+        var sdata=XLSX.utils.sheet_to_json(wb.Sheets[schedSheet],{header:1,raw:false,defval:null});
+        D=calcFromSchedule(sdata);
+      }
+      // Parse PAB for summary table rows
+      if(pabSheet){
+        var pdata=XLSX.utils.sheet_to_json(wb.Sheets[pabSheet],{header:1,raw:false,defval:null});
+        var pab=parsePAB(pdata);
+        if(pab) D=Object.assign(D,pab);
+      }
+      render(D,file.name);
+    }catch(err){setst('解析失敗：'+err.message,'#DC2626');console.error(err);}
+  };
+  r.readAsArrayBuffer(file);
+}
+
+function pd(v){if(!v)return null;if(v instanceof Date)return isNaN(v)?null:v;var d=new Date(v);return isNaN(d)?null:d;}
+
+// Parse 排程表 → supply/demand by month
+function calcFromSchedule(rows){
+  var sup={},dem={};
+  for(var i=1;i<rows.length;i++){
+    var row=rows[i];
+    var qty=parseFloat(row[5]);
+    if(!qty||isNaN(qty)||qty===0)continue;
+    var cat=row[2]!=null?String(row[2]).trim():'';
+    var demD=pd(row[13]);
+    if(cat==='1'||cat==='3'){
+      if(demD){var dk=key(demD);dem[dk]=(dem[dk]||0)+qty;}
+      continue;
+    }
+    if(demD){var dk2=key(demD);dem[dk2]=(dem[dk2]||0)+qty;}
+    var s=pd(row[8]),en=pd(row[9]);
+    if(!s||!en||en<s)continue;
+    var md={},td=0,cur=new Date(s);cur.setHours(0,0,0,0);
+    var enD=new Date(en);enD.setHours(0,0,0,0);
+    while(cur<=enD){var k=key(cur);md[k]=(md[k]||0)+1;td++;cur.setDate(cur.getDate()+1);}
+    for(var mk in md){sup[mk]=(sup[mk]||0)+(qty*md[mk]/td);}
+  }
+  var all=uniq(Object.keys(sup).concat(Object.keys(dem))).sort();
+  var dArr=all.map(function(m){return Math.round(dem[m]||0);});
+  var sArr=all.map(function(m){return Math.round(sup[m]||0);});
+  var inv=[],ri=0;
+  for(var i=0;i<all.length;i++){ri+=sArr[i]-dArr[i];inv.push(ri);}
+  var acD=[],acS=[],rat=[],rd=0,rs=0;
+  for(var i=0;i<all.length;i++){rd+=dArr[i];rs+=sArr[i];acD.push(rd);acS.push(rs);rat.push(rd>0?Math.round(rs/rd*1000)/10:null);}
+  return{schedLabels:all.map(mlabel),schedDemand:dArr,schedSupply:sArr,schedInv:inv,acD:acD,acS:acS,rat:rat};
+}
+
+// Parse PAB → summary table rows
+function parsePAB(rows){
+  // Find Jun column (first month with date >= Jun-26 range)
+  var dateRow=rows[2];
+  if(!dateRow)return null;
+  var startCol=null;
+  for(var ci=0;ci<dateRow.length;ci++){
+    var v=pd(dateRow[ci]);
+    if(v&&v.getFullYear()>=2026&&v.getMonth()===5){startCol=ci;break;}
+  }
+  if(startCol===null){
+    // try to find first date
+    for(var ci=0;ci<dateRow.length;ci++){
+      var v=pd(dateRow[ci]);
+      if(v&&v.getFullYear()>=2026){startCol=ci;break;}
+    }
+  }
+  if(startCol===null)return null;
+
+  // Find end col (last non-null date)
+  var endCol=startCol;
+  for(var ci=startCol;ci<dateRow.length;ci++){
+    var v=pd(dateRow[ci]);
+    if(v&&v.getFullYear()>=2020)endCol=ci;
+  }
+  var cols=[];for(var c=startCol;c<=endCol;c++)cols.push(c);
+
+  function getRow(ri){
+    return cols.map(function(c){
+      var v=rows[ri]?rows[ri][c]:null;
+      if(v===null||v===undefined||v==='')return null;
+      var f=parseFloat(v);return isNaN(f)?null:f;
+    });
+  }
+  function getDates(){return cols.map(function(c){return pd(dateRow[c]);});}
+
+  var dates=getDates();
+  var labels=dates.map(function(d){return d?mlabel(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')):null;}).filter(Boolean);
+
+  return{
+    labels:labels,
+    demand:getRow(3),
+    supply_asm:getRow(4),
+    inv_asm:getRow(5),
+    weeks_asm:getRow(6).map(function(v){return v!=null?Math.round(v*10)/10:null;}),
+    supply_fg:getRow(8),
+    inv_fg:getRow(9),
+    weeks_fg:getRow(10).map(function(v){return v!=null?Math.round(v*10)/10:null;}),
+    manpower:getRow(13),
+    auto_mp:getRow(14),
+    acc_demand:getRow(20),
+    acc_supply:getRow(21),
+    ratio:getRow(23).map(function(v){return v!=null?Math.round(v*100):null;})
+  };
+}
+
+function key(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');}
+function mlabel(k){var p=k.split('-');var mn=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];return mn[parseInt(p[1])-1]+'-'+p[0].slice(2);}
+function uniq(arr){return Array.from(new Set(arr));}
+
+// ── Render ─────────────────────────────────────────────────────────────────
+function render(D,fname){
+  // Decide data source for charts: PAB data preferred
+  var labels=D.labels||D.schedLabels||[];
+  var demand=D.demand||D.schedDemand||[];
+  var supply_fg=D.supply_fg||D.schedSupply||[];
+  var inv_fg=D.inv_fg||D.schedInv||[];
+  var acc_demand=D.acc_demand||D.acD||[];
+  var acc_supply=D.acc_supply||D.acS||[];
+  var ratio=D.ratio||D.rat||[];
+
+  var n=labels.length;
+  var totD=(acc_demand[n-1]||0);
+  var totS=(acc_supply[n-1]||0);
+  var finR=totD>0?(totS/totD*100).toFixed(1):'-';
+  var shortage=(inv_fg||[]).filter(function(v){return v!=null&&v<0;}).length;
+  var minInv=inv_fg?Math.min.apply(null,inv_fg.filter(function(v){return v!=null;})):0;
+  var minM=inv_fg?labels[inv_fg.indexOf(minInv)]:'';
+
+  if(shortage>0){
+    document.getElementById('abar').style.display='flex';
+    document.getElementById('atxt').textContent='共 '+shortage+' 個月缺貨風險，最大缺口：'+minM+'（庫存 '+Math.round(minInv).toLocaleString()+' pcs）';
+  } else {
+    document.getElementById('abar').style.display='none';
+  }
+
+  document.getElementById('kg').innerHTML=
+    kpi('總需求',Math.round(totD).toLocaleString(),'pcs 累計需求','#2563EB')+
+    kpi('累計供給',Math.round(totS).toLocaleString(),'ACC. Supply 最終值','#16A34A')+
+    kpi('最終達成率',finR+'%','供給 ÷ 需求',parseFloat(finR)>=100?'#16A34A':'#DC2626')+
+    kpi('缺貨月數',shortage+' 月','期末庫存為負值月份',shortage>0?'#DC2626':'#16A34A')+
+    kpi('期間',n+' 個月',labels[0]+' — '+labels[n-1],'#1A1916');
+
+  buildTable(D);
+
+  // Charts
+  if(ch0)ch0.destroy(); if(ch1)ch1.destroy();
+  ch0=new Chart(document.getElementById('c0'),{
+    data:{labels:labels,datasets:[
+      {type:'bar',label:'月需求',data:demand,backgroundColor:'rgba(37,99,235,0.72)',borderWidth:0,yAxisID:'y',order:2},
+      {type:'bar',label:'月供給(成品段)',data:supply_fg,backgroundColor:'rgba(22,163,74,0.72)',borderWidth:0,yAxisID:'y',order:2},
+      {type:'line',label:'期末庫存',data:inv_fg,borderColor:'#DC2626',borderDash:[5,3],backgroundColor:'transparent',
+        pointBackgroundColor:(inv_fg||[]).map(function(v){return v<0?'#DC2626':'#2563EB';}),
+        borderWidth:2,pointRadius:3.5,tension:0.3,yAxisID:'y2',order:1}
+    ]},
+    options:chartOpts(false)
+  });
+  ch1=new Chart(document.getElementById('c1'),{
+    data:{labels:labels,datasets:[
+      {type:'line',label:'ACC Demand',data:acc_demand,borderColor:'#2563EB',backgroundColor:'rgba(37,99,235,0.06)',fill:true,borderWidth:2.5,pointRadius:3,tension:0.3,yAxisID:'y'},
+      {type:'line',label:'ACC Supply',data:acc_supply,borderColor:'#16A34A',backgroundColor:'rgba(22,163,74,0.06)',fill:true,borderWidth:2.5,borderDash:[5,3],pointRadius:3,tension:0.3,yAxisID:'y'},
+      {type:'line',label:'達成率%',data:ratio,borderColor:'#D97706',backgroundColor:'transparent',borderWidth:2,borderDash:[4,4],pointRadius:3.5,tension:0.3,spanGaps:true,yAxisID:'y2'}
+    ]},
+    options:chartOpts(true)
+  });
+
+  document.getElementById('ptitle').textContent=fname.replace(/\.xlsx?$/i,'');
+  document.getElementById('psub').textContent='分析期間：'+labels[0]+' — '+labels[n-1]+'，共 '+n+' 個月';
+  document.getElementById('hf').textContent=fname;
+  document.getElementById('upsec').style.display='none';
+  document.getElementById('res').style.display='';
+  sw(0);
+}
+
+function kpi(label,val,sub,color){
+  return '<div class="kcard"><p class="klbl">'+label+'</p><p class="kval" style="color:'+color+'">'+val+'</p><p class="ksub">'+sub+'</p></div>';
+}
+
+function chartOpts(isAcc){
+  return{
+    responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{display:false},tooltip:{callbacks:{label:function(c){
+      if(c.dataset.yAxisID==='y2') return(c.dataset.label||'達成率')+': '+(c.parsed.y!=null?c.parsed.y.toFixed(1):'-')+'%';
+      return c.dataset.label+': '+(c.parsed.y||0).toLocaleString()+' pcs';
+    }}}},
+    scales:{
+      x:{ticks:{font:{size:10},maxRotation:45,autoSkip:false},grid:{display:false}},
+      y:{position:'left',ticks:{callback:function(v){return Math.round(v/1000)+'K';},font:{size:11}},grid:{color:'rgba(0,0,0,0.05)'}},
+      y2:{position:'right',grid:{display:false},
+        min:isAcc?60:undefined,max:isAcc?115:undefined,
+        ticks:{callback:function(v){return v+'%';},font:{size:11}}}
+    }
+  };
+}
+
+// ── Summary Table ─────────────────────────────────────────────────────────────
+function buildTable(D){
+  if(!D.labels){document.getElementById('stbl').innerHTML='<tr><td style="padding:20px;color:#9E9D96">未找到 PAB 工作表資料</td></tr>';return;}
+  var n=D.labels.length;
+  function fmt(v){return v!=null?Math.round(v).toLocaleString():'';}
+  function fmtW(v){return v!=null?v.toFixed(1):'';}
+  function nc(v){return v==null?'':v<0?'neg':v>0?'pos':'neu';}
+
+  var html='<thead><tr><th class="rl">指標</th>';
+  D.labels.forEach(function(l){html+='<th class="mc">'+l+'</th>';});
+  html+='</tr></thead><tbody>';
+
+  function section(label){
+    html+='<tr class="sh"><td class="rl">'+label+'</td>';
+    for(var i=0;i<n;i++)html+='<td></td>';
+    html+='</tr>';
+  }
+  function dataRow(label,data,fmtFn,clsFn,bold){
+    html+='<tr><td class="rl">'+(bold?'<strong>':'')+label+(bold?'</strong>':'')+'</td>';
+    (data||[]).forEach(function(v){html+='<td class="'+(clsFn?clsFn(v):'neu')+'">'+fmtFn(v)+'</td>';});
+    html+='</tr>';
+  }
+  function ratioRow(){
+    html+='<tr><td class="rl"><strong>達成率 %</strong></td>';
+    (D.ratio||[]).forEach(function(v){
+      var cls=v==null?'':v>=100?'rok':v>=90?'rwarn':'rbad';
+      html+='<td class="'+cls+'">'+(v!=null?v+'%':'')+'</td>';
+    });
+    html+='</tr>';
+  }
+  function mpRow(label,data,cls){
+    html+='<tr><td class="rl">'+label+'</td>';
+    (data||[]).forEach(function(v){
+      html+=v!=null?'<td class="'+cls+'">'+Math.round(v)+'</td>':'<td></td>';
+    });
+    html+='</tr>';
+  }
+
+  section('成品段 (Finished Goods)');
+  dataRow('Demand',D.demand,fmt,function(){return'neu';});
+  dataRow('月供給量（成品段）',D.supply_fg,fmt,function(){return'neu';});
+  dataRow('預計期末庫存（成品段）',D.inv_fg,fmt,nc,true);
+  dataRow('期末庫存 — 可用期數',D.weeks_fg,fmtW,nc);
+  section('組裝段 (Assembly)');
+  dataRow('月供給量（組裝段）',D.supply_asm,fmt,function(){return'neu';});
+  dataRow('預計期末庫存（組裝段）',D.inv_asm,fmt,nc,true);
+  dataRow('期末庫存 — 可用期數',D.weeks_asm,fmtW,nc);
+  section('累計 (Accumulated)');
+  dataRow('ACC. Demand',D.acc_demand,fmt,function(){return'neu';});
+  dataRow('ACC. Supply',D.acc_supply,fmt,function(){return'neu';});
+  ratioRow();
+  section('人力配置 (Manpower)');
+  mpRow('人工線人力',D.manpower,'mp-g');
+  mpRow('預估導入自動機人力',D.auto_mp,'mp-y');
+
+  html+='</tbody>';
+  document.getElementById('stbl').innerHTML=html;
+}
+
+function sw(n){
+  for(var i=0;i<3;i++){document.getElementById('p'+i).style.display=i===n?'':'none';document.getElementById('t'+i).classList.toggle('on',i===n);}
+}
+</script>
+</body>
+</html>
